@@ -325,4 +325,4 @@ which command-name
 
 ---
 
-[← Back to Main Guide](./README.md)
+[← Back to Main Guide](../README.md)
