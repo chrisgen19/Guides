@@ -15,10 +15,19 @@ This collection of guides is designed to help you master various aspects of web 
   - [macOS Terminal Guide](./terminal-usage/macos.md)
   - [WSL Terminal Guide](./terminal-usage/wsl.md)
 
+### Version Control
+
+- **[Git & GitHub Guide](./git-github/github-guide.md)** - Complete guide to Git and GitHub
+  - Git basics and configuration
+  - GitHub workflows and collaboration
+  - Real-life web development scenarios
+  - Branching strategies and best practices
+  - Pull requests and code reviews
+  - Troubleshooting common issues
+
 ### Coming Soon
 
 More guides will be added covering topics such as:
-- Version Control (Git)
 - Docker & Containerization
 - CI/CD Pipelines
 - Cloud Platforms (AWS, Azure, GCP)
