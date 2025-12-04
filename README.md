@@ -25,6 +25,17 @@ This collection of guides is designed to help you master various aspects of web 
   - Pull requests and code reviews
   - Troubleshooting common issues
 
+### Web Development
+
+- **[Builder.io Components Guide](./builder-io/guide.md)** - Comprehensive guide for creating Builder.io components
+  - Component architecture and setup
+  - Step-by-step component creation tutorials
+  - Working with images, buttons, and forms
+  - Container components with nested children
+  - Conditional inputs and dynamic variants
+  - Input field types and utilities reference
+  - Best practices and common patterns
+
 ### Coming Soon
 
 More guides will be added covering topics such as:

@@ -1038,6 +1038,375 @@ ssh-add ~/.ssh/id_ed25519
 git remote set-url origin git@github.com:username/repo.git
 ```
 
+### Line Ending Issues (CRLF vs LF)
+
+#### Understanding Line Endings
+
+Different operating systems use different line ending characters:
+- **Windows**: CRLF (`\r\n`) - Carriage Return + Line Feed
+- **Linux/macOS**: LF (`\n`) - Line Feed only
+
+This can cause issues when collaborating across different operating systems.
+
+#### Common CRLF Warning
+
+```bash
+# You might see this warning:
+warning: CRLF will be replaced by LF in file.txt
+The file will have its original line endings in your working directory
+```
+
+#### Solution 1: Configure Git Line Ending Behavior
+
+```bash
+# Windows users - convert to LF on commit, CRLF on checkout
+git config --global core.autocrlf true
+
+# Linux/macOS users - convert to LF on commit, keep LF on checkout
+git config --global core.autocrlf input
+
+# Disable automatic conversion (not recommended)
+git config --global core.autocrlf false
+
+# View current setting
+git config core.autocrlf
+```
+
+#### Solution 2: Use .gitattributes (Recommended)
+
+Create a `.gitattributes` file in your repository root to enforce consistent line endings across all contributors:
+
+```bash
+# Create .gitattributes file
+cat > .gitattributes << 'EOF'
+# Auto detect text files and normalize line endings to LF
+* text=auto
+
+# Explicitly declare text files you want to always normalize and convert to LF
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Python files
+*.py text eol=lf
+
+# Configuration files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+*.config text eol=lf
+
+# Windows-specific files that should use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files that should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.gz binary
+*.tar binary
+EOF
+
+# Add and commit .gitattributes
+git add .gitattributes
+git commit -m "Add .gitattributes for consistent line endings"
+```
+
+#### Complete .gitattributes Template for Web Projects
+
+```bash
+# .gitattributes
+# Handle line endings automatically for files detected as text
+# and leave all files detected as binary untouched.
+* text=auto
+
+#
+# The above will handle all files NOT found below
+#
+
+# Source code
+*.bash text eol=lf
+*.sh text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.coffee text eol=lf
+*.json text eol=lf
+*.vue text eol=lf
+*.py text eol=lf
+*.rb text eol=lf
+*.php text eol=lf
+*.java text eol=lf
+*.c text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+
+# Web files
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.xml text eol=lf
+*.svg text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+*.rst text eol=lf
+
+# Configuration files
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.config text eol=lf
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+package.json text eol=lf
+package-lock.json text eol=lf
+yarn.lock text eol=lf
+tsconfig.json text eol=lf
+
+# Windows-specific files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files (images)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.bmp binary
+
+# Binary files (fonts)
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+
+# Binary files (archives)
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.7z binary
+*.rar binary
+
+# Binary files (documents)
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# Binary files (media)
+*.mp4 binary
+*.mp3 binary
+*.mov binary
+*.avi binary
+*.wav binary
+*.flac binary
+
+# Binary files (other)
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+```
+
+#### Fix Existing Files with Wrong Line Endings
+
+If you already have files with mixed line endings in your repository:
+
+```bash
+# Method 1: Normalize all files in repository
+# WARNING: This will rewrite history, coordinate with your team!
+
+# Save your changes
+git add . -u
+git commit -m "Preparing to normalize line endings"
+
+# Add .gitattributes
+git add .gitattributes
+git commit -m "Add .gitattributes for line ending normalization"
+
+# Remove all files from index
+git rm --cached -r .
+
+# Re-add all files (Git will normalize them)
+git reset --hard
+
+# Re-add files with normalization
+git add .
+
+# Commit normalized files
+git commit -m "Normalize all line endings"
+
+# Push changes
+git push origin main
+
+# Method 2: Normalize specific files only
+git add --renormalize .
+git commit -m "Normalize line endings"
+
+# Method 3: Use dos2unix utility (Linux/macOS)
+# Install dos2unix
+sudo apt install dos2unix  # Ubuntu/Debian
+brew install dos2unix      # macOS
+
+# Convert specific file
+dos2unix path/to/file.txt
+
+# Convert all files in directory
+find . -type f -name "*.js" -exec dos2unix {} \;
+
+# For Windows, use unix2dos
+unix2dos path/to/file.bat
+```
+
+#### Best Practices for Line Endings
+
+```bash
+# 1. Always create .gitattributes at project start
+# Put it in your repository root and commit it first
+
+# 2. Team coordination
+# Ensure all team members have proper git config:
+git config --global core.autocrlf input  # Linux/macOS
+git config --global core.autocrlf true   # Windows
+
+# 3. Editor configuration
+# Create .editorconfig file
+cat > .editorconfig << 'EOF'
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{js,jsx,ts,tsx,json,css,scss,html,md}]
+indent_style = space
+indent_size = 2
+
+[*.{py,java}]
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+EOF
+
+# 4. IDE/Editor settings
+# VS Code: Add to settings.json
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true
+}
+
+# 5. Pre-commit hooks (optional)
+# Create .git/hooks/pre-commit
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+# Check for CRLF line endings
+if git diff --cached --name-only | xargs file | grep CRLF; then
+    echo "Error: Found CRLF line endings. Please fix before committing."
+    exit 1
+fi
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+#### Troubleshooting Line Ending Issues
+
+```bash
+# Check current line endings in a file
+file path/to/file.txt
+
+# View line endings visually
+cat -A path/to/file.txt
+# ^M indicates CRLF (carriage return)
+
+# Check which files have CRLF
+find . -type f -name "*.js" -exec file {} \; | grep CRLF
+
+# Git status shows all files as modified after line ending fix
+# This is normal! Commit the changes:
+git add .
+git commit -m "Normalize line endings"
+
+# Ignore line ending changes in git diff
+git diff --ignore-cr-at-eol
+
+# If GitHub shows entire file changed after line ending fix
+# This is expected. The next diff will show only real changes.
+```
+
+#### Quick Fix for Common Scenarios
+
+```bash
+# Scenario 1: Clone on Windows, push shows all files changed
+# Fix:
+git config core.autocrlf true
+git rm --cached -r .
+git reset --hard
+
+# Scenario 2: Warning on every commit
+# Fix: Add .gitattributes as shown above
+
+# Scenario 3: Mixed line endings in one file
+# Use your editor's "Convert line endings" feature
+# VS Code: Click "CRLF/LF" in bottom right → Select "LF"
+# Or use dos2unix:
+dos2unix path/to/file.txt
+
+# Scenario 4: Shell scripts not working on Linux (^M errors)
+# Convert to LF:
+dos2unix script.sh
+# Or:
+sed -i 's/\r$//' script.sh
+```
+
 ---
 
 ## Quick Reference Cheat Sheet
