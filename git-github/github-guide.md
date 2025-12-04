@@ -96,6 +96,321 @@ git config --list
 git config user.name
 ```
 
+### Separate Git Identities for Work and Personal Projects
+
+If you work on both personal and work projects, you can configure Git to automatically use different identities based on the directory.
+
+#### Method 1: Using Conditional Includes (Recommended)
+
+**Step 1: Create a separate config file for work**
+
+```bash
+# Create work-specific Git config
+cat > ~/.gitconfig-work << 'EOF'
+[user]
+    name = Your Work Name
+    email = work@company.com
+EOF
+```
+
+**Step 2: Edit your main ~/.gitconfig**
+
+```bash
+# Open your main Git config
+nano ~/.gitconfig
+# or
+code ~/.gitconfig
+```
+
+**Add this configuration:**
+
+```ini
+# ~/.gitconfig
+
+# 1. DEFAULT (Personal)
+# This applies to all repositories by default
+[user]
+    name = Your Personal Name
+    email = personal@gmail.com
+
+[init]
+    defaultBranch = main
+
+[color]
+    ui = auto
+
+[core]
+    editor = code --wait
+
+# 2. WORK PROJECTS
+# Override settings for work repositories
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig-work
+
+# For Windows/WSL with D: drive
+[includeIf "gitdir:/mnt/d/work-projects/"]
+    path = ~/.gitconfig-work
+
+# You can add multiple work directories
+[includeIf "gitdir:~/company-repos/"]
+    path = ~/.gitconfig-work
+```
+
+**Step 3: Verify configuration**
+
+```bash
+# Check global config (shows personal by default)
+git config --global user.email
+# Output: personal@gmail.com
+
+# Go to a work directory
+cd ~/work/some-project
+
+# Check config in work directory
+git config user.email
+# Output: work@company.com
+
+# Or check all settings
+git config --list --show-origin
+# Shows where each setting comes from
+```
+
+#### Method 2: Multiple Work Accounts
+
+If you have multiple work accounts (e.g., different clients):
+
+```bash
+# Create separate config files
+cat > ~/.gitconfig-work-clientA << 'EOF'
+[user]
+    name = Your Name
+    email = you@clientA.com
+EOF
+
+cat > ~/.gitconfig-work-clientB << 'EOF'
+[user]
+    name = Your Name
+    email = you@clientB.com
+EOF
+
+# Edit ~/.gitconfig
+cat >> ~/.gitconfig << 'EOF'
+[includeIf "gitdir:~/projects/clientA/"]
+    path = ~/.gitconfig-work-clientA
+
+[includeIf "gitdir:~/projects/clientB/"]
+    path = ~/.gitconfig-work-clientB
+EOF
+```
+
+#### Important Notes for Conditional Includes
+
+```bash
+# 1. Directory paths must end with a slash /
+[includeIf "gitdir:~/work/"]         # ✅ Correct
+[includeIf "gitdir:~/work"]          # ❌ Won't work
+
+# 2. Use ~/ for home directory
+[includeIf "gitdir:~/projects/"]     # ✅ Correct
+
+# 3. For WSL, use /mnt/ paths for Windows drives
+[includeIf "gitdir:/mnt/d/work/"]    # ✅ Correct for D: drive
+[includeIf "gitdir:/mnt/c/Users/you/work/"]  # ✅ For C: drive
+
+# 4. Use /** to match all subdirectories recursively
+[includeIf "gitdir:~/work/**"]       # Matches all repos under ~/work/
+
+# 5. Case sensitivity matters on Linux/macOS
+[includeIf "gitdir:~/Work/"]         # Different from ~/work/
+```
+
+#### Method 3: Per-Repository Configuration (Manual)
+
+If you don't want automatic switching, set identity per repository:
+
+```bash
+# Clone a work repository
+git clone git@github.com:company/work-repo.git
+cd work-repo
+
+# Set work identity for this repo only (no --global)
+git config user.name "Your Work Name"
+git config user.email "work@company.com"
+
+# Verify
+git config user.email
+# Output: work@company.com
+
+# This only affects the current repository
+# The setting is saved in .git/config (not ~/.gitconfig)
+```
+
+#### Complete Example Setup
+
+```bash
+# 1. Create work config file
+cat > ~/.gitconfig-work << 'EOF'
+[user]
+    name = Jane Smith
+    email = jane.smith@techcorp.com
+
+[core]
+    sshCommand = "ssh -i ~/.ssh/id_ed25519_work"
+EOF
+
+# 2. Edit main config
+cat > ~/.gitconfig << 'EOF'
+# Personal (default)
+[user]
+    name = Jane Smith
+    email = jane.personal@gmail.com
+
+[init]
+    defaultBranch = main
+
+[color]
+    ui = auto
+
+[core]
+    editor = code --wait
+    sshCommand = "ssh -i ~/.ssh/id_ed25519"
+
+# Work projects
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig-work
+
+[includeIf "gitdir:/mnt/d/work-projects/"]
+    path = ~/.gitconfig-work
+EOF
+
+# 3. Test it
+cd ~
+git config user.email
+# Output: jane.personal@gmail.com
+
+cd ~/work/some-project
+git config user.email
+# Output: jane.smith@techcorp.com
+```
+
+#### Using Different SSH Keys for Work and Personal
+
+You can also configure different SSH keys:
+
+```bash
+# 1. Generate separate SSH keys
+ssh-keygen -t ed25519 -C "personal@gmail.com" -f ~/.ssh/id_ed25519
+ssh-keygen -t ed25519 -C "work@company.com" -f ~/.ssh/id_ed25519_work
+
+# 2. Add to SSH agent
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+ssh-add ~/.ssh/id_ed25519_work
+
+# 3. Create SSH config
+cat > ~/.ssh/config << 'EOF'
+# Personal GitHub
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519
+
+# Work GitHub
+Host github-work
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_work
+EOF
+
+# 4. Add work SSH key to .gitconfig-work
+cat > ~/.gitconfig-work << 'EOF'
+[user]
+    name = Your Work Name
+    email = work@company.com
+
+[core]
+    sshCommand = "ssh -i ~/.ssh/id_ed25519_work"
+EOF
+
+# 5. Clone work repos with work SSH key
+git clone git@github-work:company/repo.git
+
+# Or update existing repo
+cd work-repo
+git remote set-url origin git@github-work:company/repo.git
+```
+
+#### Troubleshooting Multiple Identities
+
+```bash
+# Check which config file is being used
+git config --list --show-origin | grep user.email
+# Shows file path for each setting
+
+# Check effective configuration in current directory
+git config user.name
+git config user.email
+
+# Show all configurations and their sources
+git config --list --show-origin --show-scope
+
+# Verify SSH key being used
+ssh -T git@github.com           # Personal
+ssh -T git@github-work          # Work
+
+# If wrong identity is used, check:
+# 1. Directory path in includeIf has trailing /
+# 2. You're actually inside the specified directory
+# 3. The path in includeIf matches your actual path
+pwd  # Check current directory
+
+# Force reload config (usually automatic)
+cd .. && cd -
+```
+
+#### Best Practices
+
+```bash
+# 1. Keep work and personal projects in separate directories
+~/personal/
+  ├── project1/
+  └── project2/
+
+~/work/
+  ├── work-project1/
+  └── work-project2/
+
+# 2. Always verify identity before first commit in new repo
+git config user.email
+
+# 3. Create an alias to check identity
+git config --global alias.whoami "config user.email"
+# Usage: git whoami
+
+# 4. Test your setup after configuration
+cd ~/personal/test-repo
+git config user.email  # Should show personal email
+
+cd ~/work/test-repo
+git config user.email  # Should show work email
+
+# 5. Add a pre-commit hook to verify identity (optional)
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+EMAIL=$(git config user.email)
+if [[ "$EMAIL" != *"@company.com" ]]; then
+    echo "Warning: Not using work email!"
+    echo "Current email: $EMAIL"
+    read -p "Continue? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
 ### SSH Key Setup (Recommended)
 
 ```bash
