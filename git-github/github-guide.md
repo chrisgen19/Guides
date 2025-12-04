@@ -1294,6 +1294,466 @@ git push
 # File is now ignored but remains on your computer
 ```
 
+### Preventing Files from Being Committed (Beyond .gitignore)
+
+Sometimes you need to ignore files locally without sharing those rules with your team, or you want extra safety nets to prevent sensitive files from being committed or deployed.
+
+#### Method 1: Local Ignore with .git/info/exclude (Recommended for Personal Files)
+
+The `.git/info/exclude` file works exactly like `.gitignore`, but it's **strictly local** to your machine and never committed to the repository.
+
+**Use this when:**
+- You have personal config files (`.claude.json`, `.vscode/settings.json`, etc.)
+- You don't want to clutter team's `.gitignore` with personal preferences
+- You want to ignore files without affecting other developers
+
+**Step 1: Edit the exclude file**
+
+```bash
+# Navigate to your project
+cd your-project
+
+# Edit the exclude file (create if doesn't exist)
+nano .git/info/exclude
+# or
+code .git/info/exclude
+```
+
+**Step 2: Add your exclusion rules**
+
+```bash
+# .git/info/exclude
+
+# Personal config files
+.claude.json
+.claude/
+
+# Personal IDE settings
+.vscode/settings.json
+.idea/workspace.xml
+
+# Personal notes
+NOTES.md
+TODO.txt
+
+# Personal test files
+test-*.js
+scratch/
+
+# OS-specific (if not in .gitignore)
+.DS_Store
+Thumbs.db
+```
+
+**Step 3: Verify it works**
+
+```bash
+# Check status (excluded files won't appear)
+git status
+
+# Force check if file is ignored
+git check-ignore -v .claude.json
+# Output: .git/info/exclude:1:.claude.json	.claude.json
+```
+
+**Important notes:**
+
+```bash
+# This only affects NEW files
+# If file is already tracked, you must untrack it first:
+git rm --cached .claude.json
+git commit -m "Remove .claude.json from tracking"
+
+# Then add to .git/info/exclude
+echo ".claude.json" >> .git/info/exclude
+
+# Now the file is ignored locally but stays on your machine
+```
+
+#### Method 2: Global Gitignore (For All Your Repos)
+
+Create a global ignore file for patterns you never want to commit in any project:
+
+```bash
+# Create global gitignore file
+touch ~/.gitignore_global
+
+# Configure Git to use it
+git config --global core.excludesfile ~/.gitignore_global
+
+# Edit the file
+cat >> ~/.gitignore_global << 'EOF'
+# Personal files
+.claude.json
+.claude/
+.cursor/
+.aider*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.idea/workspace.xml
+
+# Personal notes
+NOTES.md
+SCRATCH.md
+TODO-personal.md
+EOF
+
+# Verify global config
+git config --global core.excludesfile
+# Output: /home/username/.gitignore_global
+```
+
+#### Method 3: Prevent Deployment with Platform-Specific Ignore Files
+
+Even if files are in your repo, you can prevent them from being deployed:
+
+**For Docker (.dockerignore)**
+
+```bash
+# Create .dockerignore in project root
+cat > .dockerignore << 'EOF'
+# Development files
+.claude.json
+.claude/
+.env.local
+.vscode/
+.idea/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CONTRIBUTING.md
+docs/
+
+# Tests
+tests/
+*.test.js
+*.spec.js
+coverage/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies (will be installed fresh)
+node_modules/
+EOF
+
+git add .dockerignore
+git commit -m "Add .dockerignore for secure builds"
+```
+
+**For Vercel (.vercelignore)**
+
+```bash
+# Create .vercelignore
+cat > .vercelignore << 'EOF'
+# Development files
+.claude.json
+.claude/
+.env.local
+.env*.local
+
+# Source control
+.git/
+
+# Dependencies
+node_modules/
+
+# Tests
+tests/
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Documentation
+README.md
+docs/
+EOF
+
+git add .vercelignore
+git commit -m "Add .vercelignore"
+```
+
+**For Heroku (.slugignore)**
+
+```bash
+# Create .slugignore
+cat > .slugignore << 'EOF'
+# Development files
+.claude.json
+.claude/
+.env.local
+
+# Tests
+tests/
+*.test.js
+spec/
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+
+# Git files
+.git/
+.gitignore
+EOF
+
+git add .slugignore
+git commit -m "Add .slugignore"
+```
+
+**For Netlify (netlify.toml)**
+
+```toml
+# netlify.toml
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  # Files to exclude from deployment
+  ignore = [".claude.json", ".claude/", "*.local"]
+```
+
+#### Method 4: Pre-commit Hook (Hard Stop)
+
+Create a Git hook that prevents you from accidentally committing sensitive files:
+
+```bash
+# Create pre-commit hook
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+
+# Colors for output
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Files that should NEVER be committed
+FORBIDDEN_FILES=(
+    ".claude.json"
+    ".claude"
+    ".env.local"
+    "secrets.json"
+    "credentials.json"
+)
+
+# Check if any forbidden files are being staged
+for file in "${FORBIDDEN_FILES[@]}"; do
+    if git diff --cached --name-only | grep -q "$file"; then
+        echo -e "${RED}ERROR: You are attempting to commit '$file'!${NC}"
+        echo "This file should not be committed to the repository."
+        echo "Add it to .git/info/exclude or .gitignore instead."
+        exit 1
+    fi
+done
+
+# Check for common secret patterns in staged files
+if git diff --cached | grep -E "(api_key|secret|password|token).*=.*['\"][^'\"]{8,}['\"]"; then
+    echo -e "${RED}WARNING: Possible secrets detected in staged files!${NC}"
+    echo "Please review your changes carefully."
+    read -p "Continue anyway? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+exit 0
+EOF
+
+# Make it executable
+chmod +x .git/hooks/pre-commit
+
+# Test it
+touch .claude.json
+git add .claude.json
+git commit -m "test"
+# Output: ERROR: You are attempting to commit '.claude.json'!
+```
+
+#### Method 5: Git Hooks with Husky (Team-Wide Protection)
+
+For team-wide protection, use Husky to share hooks:
+
+```bash
+# Install Husky
+npm install --save-dev husky
+
+# Initialize Husky
+npx husky init
+
+# Create pre-commit hook
+cat > .husky/pre-commit << 'EOF'
+#!/bin/bash
+
+# Prevent committing sensitive files
+FORBIDDEN_FILES=".claude.json|.env.local|secrets.json"
+
+if git diff --cached --name-only | grep -E "$FORBIDDEN_FILES"; then
+    echo "ERROR: Attempting to commit sensitive files!"
+    echo "Files detected: $(git diff --cached --name-only | grep -E "$FORBIDDEN_FILES")"
+    exit 1
+fi
+
+# Run linter/tests if needed
+npm run lint
+EOF
+
+chmod +x .husky/pre-commit
+
+# Commit the hook (shared with team)
+git add .husky/pre-commit
+git commit -m "Add pre-commit hook to prevent committing secrets"
+```
+
+#### Complete Example: Layered Protection Strategy
+
+Here's how to set up multiple layers of protection:
+
+```bash
+# Layer 1: Local ignore (.git/info/exclude)
+cat >> .git/info/exclude << 'EOF'
+.claude.json
+.claude/
+.env.local
+EOF
+
+# Layer 2: Global ignore (all your projects)
+cat >> ~/.gitignore_global << 'EOF'
+.claude.json
+.claude/
+EOF
+
+# Layer 3: Docker deployment protection
+cat > .dockerignore << 'EOF'
+.claude.json
+.claude/
+.env.local
+.git/
+EOF
+
+# Layer 4: Pre-commit hook (hard stop)
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/bash
+if git diff --cached --name-only | grep -q ".claude.json"; then
+    echo "ERROR: Cannot commit .claude.json!"
+    exit 1
+fi
+EOF
+chmod +x .git/hooks/pre-commit
+
+# Layer 5: If file was already committed, remove it
+git rm --cached .claude.json 2>/dev/null || true
+echo ".claude.json" >> .gitignore
+git add .gitignore
+git commit -m "Remove .claude.json from tracking and add to .gitignore" || true
+```
+
+#### Comparison: When to Use Each Method
+
+| Method | Scope | Shared with Team | Use Case |
+|--------|-------|------------------|----------|
+| `.gitignore` | Repository | ✅ Yes | Team-wide ignored files (node_modules, .env) |
+| `.git/info/exclude` | Repository | ❌ No | Personal files, local configs |
+| `~/.gitignore_global` | All repos | ❌ No | Personal preferences across all projects |
+| `.dockerignore` | Docker builds | ✅ Yes | Prevent files from entering container |
+| `.vercelignore` | Vercel deploy | ✅ Yes | Prevent files from being deployed |
+| Pre-commit hook (local) | Repository | ❌ No | Personal safety net |
+| Pre-commit hook (Husky) | Repository | ✅ Yes | Team-wide safety net |
+
+#### Troubleshooting
+
+```bash
+# File still appears in git status after adding to exclude
+# Reason: File is already tracked
+# Solution:
+git rm --cached .claude.json
+# Then it will be ignored
+
+# Check which ignore rule is affecting a file
+git check-ignore -v .claude.json
+# Shows: .git/info/exclude:1:.claude.json	.claude.json
+
+# Check if file is tracked
+git ls-files .claude.json
+# No output = not tracked (good!)
+# Shows filename = tracked (need to untrack)
+
+# Verify exclude file exists and is correct
+cat .git/info/exclude
+
+# Check global gitignore location
+git config --global core.excludesfile
+
+# Test pre-commit hook
+# Create forbidden file
+touch .claude.json
+git add .claude.json
+git commit -m "test"
+# Should block if hook is working
+
+# If hook isn't running, check executable permission
+ls -la .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+#### Best Practices
+
+```bash
+# 1. Remove file from tracking first, THEN ignore it
+git rm --cached sensitive-file.txt
+echo "sensitive-file.txt" >> .git/info/exclude
+git commit -m "Remove sensitive file from tracking"
+
+# 2. Use .git/info/exclude for personal files
+echo ".claude.json" >> .git/info/exclude
+echo ".vscode/settings.json" >> .git/info/exclude
+
+# 3. Use .gitignore for team-wide patterns
+echo "node_modules/" >> .gitignore
+echo ".env" >> .gitignore
+git add .gitignore
+git commit -m "Update .gitignore"
+
+# 4. Always use deployment ignore files
+# Create .dockerignore, .vercelignore, etc.
+
+# 5. Set up pre-commit hooks for critical files
+# Especially for secrets, credentials, API keys
+
+# 6. Document your ignore strategy in README
+cat >> README.md << 'EOF'
+
+## Local Development
+
+Create a `.claude.json` file for AI assistance:
+```json
+{"api_key": "your-key"}
+```
+
+This file is ignored by Git (via .git/info/exclude) and will not be committed.
+EOF
+```
+
 ### Diverged Branches
 
 ```bash
